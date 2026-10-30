@@ -37,6 +37,10 @@
     #ergebnis img { max-width: 100%; border-radius: 12px; }
     #ergebnis iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 12px; }
     #ergebnis a { color: #e85d75; }
+    #ergebnis iframe.spotify { aspect-ratio: auto; height: 352px; }
+    #ergebnis h2 { font-size: 1.6rem; margin-bottom: 0.5rem; }
+    .gedicht { white-space: pre-line; text-align: left; line-height: 1.6; font-size: 1.1rem; }
+    .ort { text-align: right; font-style: italic; color: #888; font-size: 1rem; }
     .konfetti {
       position: fixed;
       top: -2rem;
@@ -55,7 +59,7 @@
 
   <script>
     // >>> HIER die Adresse deines Cloudflare Workers eintragen (ohne / am Ende) <<<
-    const WORKER_URL = "https://suprise.christina-k-kuhn.workers.dev";
+    const WORKER_URL = "https://ueberraschung.DEINNAME.workers.dev";
 
     const knopf = document.getElementById("knopf");
     const hinweis = document.getElementById("hinweis");
@@ -91,7 +95,16 @@
       if (u.text && u.typ !== "link") ergebnis.append(element("p", { textContent: u.text }));
 
       if (u.typ === "text") {
-        ergebnis.append(element("p", { textContent: u.inhalt }));
+        if (u.titel) ergebnis.append(element("h2", { textContent: u.titel }));
+        ergebnis.append(element("p", { className: "gedicht", textContent: u.inhalt }));
+        if (u.ort) ergebnis.append(element("p", { className: "ort", textContent: "~ " + u.ort }));
+      } else if (u.typ === "spotify") {
+        ergebnis.append(element("iframe", {
+          className: "spotify",
+          src: "https://open.spotify.com/embed/album/" + u.albumId,
+          allow: "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture",
+          loading: "lazy"
+        }));
       } else if (u.typ === "bild") {
         ergebnis.append(element("img", { src: u.url, alt: u.alt || "" }));
       } else if (u.typ === "video") {
