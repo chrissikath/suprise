@@ -40,6 +40,7 @@
     #ergebnis iframe.spotify { aspect-ratio: auto; height: 352px; }
     #ergebnis h2 { font-size: 1.6rem; margin-bottom: 0.5rem; }
     .gedicht { white-space: pre-line; text-align: left; line-height: 1.6; font-size: 1.1rem; }
+    .clip { width: 100%; border-radius: 12px; margin-bottom: 1rem; background: #000; }
     .ort { text-align: right; font-style: italic; color: #888; font-size: 1rem; }
     .konfetti {
       position: fixed;
@@ -105,6 +106,12 @@
           allow: "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture",
           loading: "lazy"
         }));
+      } else if (u.typ === "videos") {
+        for (const url of u.urls) {
+          ergebnis.append(element("video", {
+            src: url, controls: true, playsInline: true, preload: "metadata", className: "clip"
+          }));
+        }
       } else if (u.typ === "bild") {
         ergebnis.append(element("img", { src: u.url, alt: u.alt || "" }));
       } else if (u.typ === "video") {
