@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tägliche Überraschung</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #fdf6ec;
+      color: #333;
+      margin: 0;
+      padding: 16px;
+      min-height: 100vh;
+      box-sizing: border-box;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    button {
+      font-size: 1.4rem;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: 999px;
+      background: #e85d75;
+      color: white;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #b8445a;
+      transition: transform 0.1s;
+    }
+    button:active { transform: translateY(3px); box-shadow: 0 1px 0 #b8445a; }
+    button:disabled { background: #ccc; box-shadow: 0 4px 0 #aaa; cursor: not-allowed; }
+    #hinweis { margin-top: 1rem; color: #888; }
+    #ergebnis { margin-top: 2rem; width: 100%; max-width: 600px; font-size: 1.3rem; }
+    #ergebnis img { max-width: 100%; border-radius: 12px; }
+    #ergebnis iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 12px; }
+    #ergebnis a { color: #e85d75; }
+    .konfetti {
+      position: fixed;
+      top: -2rem;
+      font-size: 1.6rem;
+      pointer-events: none;
+      animation: fallen linear forwards;
+    }
+    @keyframes fallen { to { transform: translateY(110vh) rotate(720deg); } }
+  </style>
+</head>
+<body>
+  <h1>Deine tägliche Überraschung</h1>
+  <button id="knopf" disabled>Drück mich!</button>
+  <p id="hinweis">Lade …</p>
+  <div id="ergebnis"></div>
+
+  <script>
+    // >>> HIER die Adresse deines Cloudflare Workers eintragen (ohne / am Ende) <<<
+    const WORKER_URL = "https://ueberraschung.DEINNAME.workers.dev";
+
+    const knopf = document.getElementById("knopf");
+    const hinweis = document.getElementById("hinweis");
+    const ergebnis = document.getElementById("ergebnis");
+    const SPEICHER_KEY = "letzterKlick";
+
+    let serverDatum = null;
+    let sekundenBisMorgen = 0;
+    let gestartet = false;
+    let startDatum = "";
+
+    function lesen() { try { return localStorage.getItem(SPEICHER_KEY); } catch (e) { return null; } }
+    function schreiben(wert) { try { localStorage.setItem(SPEICHER_KEY, wert); } catch (e) {} }
+
+    function element(tag, eigenschaften) {
+      return Object.assign(document.createElement(tag), eigenschaften);
+    }
+
+    function konfetti() {
+      const zeichen = ["🎉", "✨", "🎊", "⭐", "💖"];
+      for (let i = 0; i < 40; i++) {
+        const k = element("span", { className: "konfetti", textContent: zeichen[i % zeichen.length] });
+        k.style.left = Math.random() * 100 + "vw";
+        k.style.animationDuration = 2 + Math.random() * 3 + "s";
+        k.style.animationDelay = Math.random() * 1.5 + "s";
+        document.body.append(k);
+        setTimeout(() => k.remove(), 7000);
+      }
+    }
+
+    function zeige(u, ersterKlick) {
+      ergebnis.innerHTML = "";
+      if (u.text && u.typ !== "link") ergebnis.append(element("p", { textContent: u.text }));
+
+      if (u.typ === "text") {
+        ergebnis.append(element("p", { textContent: u.inhalt }));
+      } else if (u.typ === "bild") {
+        ergebnis.append(element("img", { src: u.url, alt: u.alt || "" }));
+      } else if (u.typ === "video") {
+        ergebnis.append(element("iframe", {
+          src: "https://www.youtube-nocookie.com/embed/" + u.youtubeId,
+          allow: "autoplay; encrypted-media; picture-in-picture",
+          allowFullscreen: true
+        }));
+      } else if (u.typ === "link") {
+        ergebnis.append(element("a", { href: u.url, textContent: u.text || u.url }));
+        if (ersterKlick) {
+          ergebnis.append(element("p", { textContent: "Du wirst gleich weitergeleitet …" }));
+          setTimeout(() => { window.location.href = u.url; }, 1500);
+        }
+      } else if (u.typ === "konfetti") {
+        if (ersterKlick) konfetti();
+      }
+    }
+
+    function format(s) {
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sek = s % 60;
+      return h + " h " + String(m).padStart(2, "0") + " min " + String(sek).padStart(2, "0") + " s";
+    }
+
+    async function holen(pfad) {
+      const r = await fetch(WORKER_URL + pfad, { cache: "no-store" });
+      if (!r.ok) throw new Error("Server antwortet mit " + r.status);
+      return r.json();
+    }
+
+    // Fragt den Server nach dem heutigen Datum (ohne Inhalte)
+    async function statusLaden() {
+      try {
+        const d = await holen("/datum");
+        serverDatum = d.datum;
+        sekundenBisMorgen = d.sekundenBisMorgen;
+        gestartet = d.gestartet;
+        startDatum = d.start;
+
+        if (!gestartet) {
+          knopf.disabled = true;
+          ergebnis.innerHTML = "";
+          hinweis.textContent = "Geduld! Los geht's am " + startDatum.split("-").reverse().join(".") + ".";
+        } else if (lesen() === serverDatum) {
+          knopf.disabled = true;
+          const h = await holen("/heute");
+          zeige(h.ueberraschung, false);
+        } else {
+          knopf.disabled = false;
+          ergebnis.innerHTML = "";
+          hinweis.textContent = "Du hast heute noch nicht gedrückt!";
+        }
+      } catch (e) {
+        knopf.disabled = true;
+        hinweis.textContent = "Keine Verbindung zum Überraschungs-Server. Bitte später nochmal versuchen.";
+      }
+    }
+
+    knopf.addEventListener("click", async () => {
+      knopf.disabled = true;
+      try {
+        const h = await holen("/heute");
+        schreiben(h.datum);
+        zeige(h.ueberraschung, true);
+      } catch (e) {
+        knopf.disabled = false;
+        hinweis.textContent = "Hat nicht geklappt – bitte nochmal drücken.";
+      }
+    });
+
+    // Countdown; um Mitternacht (Serverzeit) wird neu geladen
+    setInterval(() => {
+      if (!serverDatum) return;
+      sekundenBisMorgen--;
+      if (sekundenBisMorgen <= 0) { statusLaden(); return; }
+      if (gestartet && lesen() === serverDatum) {
+        hinweis.textContent = "Nächste Überraschung in " + format(sekundenBisMorgen);
+      }
+    }, 1000);
+
+    statusLaden();
+  </script>
+</body>
+</html>
