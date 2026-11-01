@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tägliche Überraschung</title>
+  <title>Täglicher Content für dich!</title>
   <style>
     body {
       font-family: system-ui, sans-serif;
-      background: #fdf6ec;
-      color: #333;
+      background: #1a1a1d;
+      color: #ececec;
       margin: 0;
       padding: 16px;
       min-height: 100vh;
@@ -24,24 +24,33 @@
       padding: 1rem 2rem;
       border: none;
       border-radius: 999px;
-      background: #e85d75;
+      background: #7C9EB2;
       color: white;
       cursor: pointer;
-      box-shadow: 0 4px 0 #b8445a;
+      box-shadow: 0 4px 0 #5a7a8d;
       transition: transform 0.1s;
     }
-    button:active { transform: translateY(3px); box-shadow: 0 1px 0 #b8445a; }
-    button:disabled { background: #ccc; box-shadow: 0 4px 0 #aaa; cursor: not-allowed; }
-    #hinweis { margin-top: 1rem; color: #888; }
+    button:active { transform: translateY(3px); box-shadow: 0 1px 0 #5a7a8d; }
+    button:disabled { background: #3a3a3f; color: #8a8a90; box-shadow: 0 4px 0 #2a2a2e; cursor: not-allowed; }
+    #intro { max-width: 560px; line-height: 1.6; margin: 0 0 1.5rem; }
+    .ytlink { display: inline-block; margin-top: 0.5rem; font-size: 1rem; }
+    #hinweis { margin-top: 1rem; color: #9a9aa0; }
     #ergebnis { margin-top: 2rem; width: 100%; max-width: 600px; font-size: 1.3rem; }
     #ergebnis img { max-width: 100%; border-radius: 12px; }
     #ergebnis iframe { width: 100%; aspect-ratio: 16 / 9; border: 0; border-radius: 12px; }
-    #ergebnis a { color: #e85d75; }
+    #ergebnis a { color: #f07a8f; }
     #ergebnis iframe.spotify { aspect-ratio: auto; height: 352px; }
     #ergebnis h2 { font-size: 1.6rem; margin-bottom: 0.5rem; }
     .gedicht { white-space: pre-line; text-align: left; line-height: 1.6; font-size: 1.1rem; }
+    .galeriebild { margin: 0 0 2rem; }
+    .galeriebild img { width: 100%; border-radius: 12px; display: block; }
+    .galeriebild figcaption { margin-top: 0.5rem; font-size: 1.05rem; }
+    .galeriebild strong { color: #e85d75; font-size: 1.3rem; }
+    .finalbild { width: 100%; border-radius: 12px; margin-top: 2rem; display: block; }
+    .nachsatz { font-size: 1.4rem; font-weight: 600; color: #e85d75; margin-top: 1rem; }
+    #ergebnis iframe.soundcloud { aspect-ratio: auto; height: 400px; }
     .clip { width: 100%; border-radius: 12px; margin-bottom: 1rem; background: #000; }
-    .ort { text-align: right; font-style: italic; color: #888; font-size: 1rem; }
+    .ort { text-align: right; font-style: italic; color: #9a9aa0; font-size: 1rem; }
     .konfetti {
       position: fixed;
       top: -2rem;
@@ -53,7 +62,8 @@
   </style>
 </head>
 <body>
-  <h1>Deine tägliche Überraschung</h1>
+  <h1>Täglicher Content für dich! ✨</h1>
+  <p id="intro">Hallo Jostein! Ein bisschen Content für dich für 3 Wochen: Hidden YouTube Gems, natürlich musiiiiic, ein paar (dir noch unbekannte) Bilder und Videos und zu guter Letzt ein paar Auszüge aus meinen Notizen, die ich mir manchmal so mache. Ich hoffe, es gefällt dir – Hab dich lieb!</p>
   <button id="knopf" disabled>Drück mich!</button>
   <p id="hinweis">Lade …</p>
   <div id="ergebnis"></div>
@@ -99,6 +109,10 @@
         if (u.titel) ergebnis.append(element("h2", { textContent: u.titel }));
         ergebnis.append(element("p", { className: "gedicht", textContent: u.inhalt }));
         if (u.ort) ergebnis.append(element("p", { className: "ort", textContent: "~ " + u.ort }));
+        if (u.urls) {
+          for (const url of u.urls) ergebnis.append(element("img", { src: url, alt: u.alt || "", className: "finalbild" }));
+        }
+        if (u.nachsatz) ergebnis.append(element("p", { className: "nachsatz", textContent: u.nachsatz }));
       } else if (u.typ === "spotify") {
         ergebnis.append(element("iframe", {
           className: "spotify",
@@ -106,6 +120,25 @@
           allow: "autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture",
           loading: "lazy"
         }));
+      } else if (u.typ === "soundcloud") {
+        ergebnis.append(element("iframe", {
+          className: "soundcloud",
+          src: "https://w.soundcloud.com/player/?url=" + encodeURIComponent(u.url) + "&color=%23e85d75&visual=true",
+          allow: "autoplay"
+        }));
+        ergebnis.append(element("a", {
+          className: "ytlink", href: u.url, target: "_blank", rel: "noopener", textContent: "▶ Auf SoundCloud öffnen"
+        }));
+      } else if (u.typ === "galerie") {
+        if (u.titel) ergebnis.append(element("h2", { textContent: u.titel }));
+        for (const b of u.bilder) {
+          const fig = element("figure", { className: "galeriebild" });
+          fig.append(element("img", { src: b.url, alt: b.text, loading: "lazy" }));
+          const cap = element("figcaption");
+          cap.append(element("strong", { textContent: b.jahr }), document.createTextNode(" · " + b.text));
+          fig.append(cap);
+          ergebnis.append(fig);
+        }
       } else if (u.typ === "videos") {
         for (const url of u.urls) {
           ergebnis.append(element("video", {
@@ -113,12 +146,16 @@
           }));
         }
       } else if (u.typ === "bild") {
-        ergebnis.append(element("img", { src: u.url, alt: u.alt || "" }));
+        ergebnis.append(element("img", { src: u.url || u.urls[0], alt: u.alt || "" }));
       } else if (u.typ === "video") {
         ergebnis.append(element("iframe", {
           src: "https://www.youtube-nocookie.com/embed/" + u.youtubeId,
           allow: "autoplay; encrypted-media; picture-in-picture",
           allowFullscreen: true
+        }));
+        ergebnis.append(element("a", {
+          className: "ytlink", href: "https://www.youtube.com/watch?v=" + u.youtubeId,
+          target: "_blank", rel: "noopener", textContent: "▶ Auf YouTube öffnen"
         }));
       } else if (u.typ === "link") {
         ergebnis.append(element("a", { href: u.url, textContent: u.text || u.url }));
