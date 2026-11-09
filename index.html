@@ -49,6 +49,13 @@
     .finalbild { width: 100%; border-radius: 12px; margin-top: 2rem; display: block; }
     .nachsatz { font-size: 1.4rem; font-weight: 600; color: #e85d75; margin-top: 1rem; }
     #ergebnis iframe.soundcloud { aspect-ratio: auto; height: 400px; }
+    #archiv { margin-top: 1.5rem; width: 100%; max-width: 600px; }
+    .archivtitel { color: #9a9aa0; font-size: 0.95rem; margin: 0 0 0.6rem; }
+    #tagliste { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+    #tagliste button { font-size: 0.9rem; padding: 0.35rem 0.75rem; border-radius: 999px;
+      background: #2a2a2e; color: #ececec; box-shadow: none; }
+    #tagliste button.aktiv { background: #7C9EB2; color: #fff; }
+    .tagkopf { color: #7C9EB2; font-size: 1rem; margin: 0 0 0.5rem; letter-spacing: 0.03em; }
     .clip { width: 100%; border-radius: 12px; margin-bottom: 1rem; background: #000; }
     .ort { text-align: right; font-style: italic; color: #9a9aa0; font-size: 1rem; }
     .konfetti {
@@ -63,9 +70,13 @@
 </head>
 <body>
   <h1>Täglicher Content für dich! ✨</h1>
-  <p id="intro">Hallo Jostiein! Ein bisschen Content für dich für 3 Wochen: Hidden YouTube Gems, natürlich musiiiiic, ein paar (dir noch unbekannte) Bilder und Videos und zu guter Letzt ein paar Auszüge aus meinen Notizen, die ich mir manchmal so mache. Ich hoffe, es gefällt dir – Hab dich lieb!</p>
+  <p id="intro">Hallo Jostein! Ein bisschen Content für dich für 3 Wochen: Hidden YouTube Gems, natürlich musiiiiic, ein paar (dir noch unbekannte) Bilder und Videos und zu guter Letzt ein paar Auszüge aus meinen Notizen, die ich mir manchmal so mache. Ich hoffe, es gefällt dir – Hab dich lieb!</p>
   <button id="knopf" disabled>Drück mich!</button>
   <p id="hinweis">Lade …</p>
+  <div id="archiv" hidden>
+    <p class="archivtitel">Verpasst? Hier kannst du zurückschauen:</p>
+    <div id="tagliste"></div>
+  </div>
   <div id="ergebnis"></div>
 
   <script>
@@ -81,6 +92,10 @@
     let sekundenBisMorgen = 0;
     let gestartet = false;
     let startDatum = "";
+    let heuteTag = 0;
+    let gesamt = 0;
+    const tagliste = document.getElementById("tagliste");
+    const archiv = document.getElementById("archiv");
 
     function lesen() { try { return localStorage.getItem(SPEICHER_KEY); } catch (e) { return null; } }
     function schreiben(wert) { try { localStorage.setItem(SPEICHER_KEY, wert); } catch (e) {} }
@@ -179,6 +194,56 @@
       return r.json();
     }
 
+    // Datum eines Tages als "Mo 2.11."
+    function tagDatum(n) {
+      const [y, m, d] = startDatum.split("-").map(Number);
+      const t = new Date(Date.UTC(y, m - 1, d + n - 1));
+      return ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"][t.getUTCDay()] + " " + t.getUTCDate() + "." + (t.getUTCMonth() + 1) + ".";
+    }
+
+    function markiere(knopfText) {
+      for (const b of tagliste.children) b.classList.toggle("aktiv", b.dataset.ziel === knopfText);
+    }
+
+    // Leiste mit allen vergangenen Tagen (+ "Heute", wenn schon gedrückt)
+    function archivZeichnen() {
+      tagliste.innerHTML = "";
+      const letzter = Math.min(heuteTag - 1, gesamt);
+      for (let n = 1; n <= letzter; n++) {
+        const b = element("button", { textContent: "Tag " + n + " · " + tagDatum(n) });
+        b.dataset.ziel = String(n);
+        b.onclick = () => vergangenenTagZeigen(n);
+        tagliste.append(b);
+      }
+      if (heuteTag <= gesamt && lesen() === serverDatum) {
+        const b = element("button", { textContent: "Heute" });
+        b.dataset.ziel = "heute";
+        b.onclick = heuteZeigen;
+        tagliste.append(b);
+      }
+      archiv.hidden = tagliste.children.length === 0;
+    }
+
+    async function vergangenenTagZeigen(n) {
+      try {
+        const h = await holen("/tag/" + n);
+        zeige(h.ueberraschung, false);
+        ergebnis.prepend(element("p", { className: "tagkopf", textContent: "Tag " + n + " · " + tagDatum(n) }));
+        markiere(String(n));
+        ergebnis.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (e) {
+        hinweis.textContent = "Dieser Tag konnte nicht geladen werden.";
+      }
+    }
+
+    async function heuteZeigen() {
+      try {
+        const h = await holen("/heute");
+        zeige(h.ueberraschung, false);
+        markiere("heute");
+      } catch (e) {}
+    }
+
     // Fragt den Server nach dem heutigen Datum (ohne Inhalte)
     async function statusLaden() {
       try {
@@ -187,6 +252,8 @@
         sekundenBisMorgen = d.sekundenBisMorgen;
         gestartet = d.gestartet;
         startDatum = d.start;
+        heuteTag = d.heuteTag;
+        gesamt = d.gesamt;
 
         if (!gestartet) {
           knopf.disabled = true;
@@ -196,11 +263,13 @@
           knopf.disabled = true;
           const h = await holen("/heute");
           zeige(h.ueberraschung, false);
+          markiere("heute");
         } else {
           knopf.disabled = false;
           ergebnis.innerHTML = "";
           hinweis.textContent = "Du hast heute noch nicht gedrückt!";
         }
+        if (gestartet) archivZeichnen();
       } catch (e) {
         knopf.disabled = true;
         hinweis.textContent = "Keine Verbindung zum Überraschungs-Server. Bitte später nochmal versuchen.";
@@ -213,6 +282,8 @@
         const h = await holen("/heute");
         schreiben(h.datum);
         zeige(h.ueberraschung, true);
+        archivZeichnen();
+        markiere("heute");
       } catch (e) {
         knopf.disabled = false;
         hinweis.textContent = "Hat nicht geklappt – bitte nochmal drücken.";
